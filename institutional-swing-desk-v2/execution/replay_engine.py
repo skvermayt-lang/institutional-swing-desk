@@ -2,6 +2,7 @@ from data_engine.price_loader import load_price
 from core.signal_engine import generate_signal
 from core.oi_engine import get_oi_data
 from core.capital_engine import build_trade_plan
+from core.portfolio_engine import can_take_trade, register_trade
 from core.telegram_engine import send_message
 
 WATCHLIST = [
@@ -38,7 +39,11 @@ def run_live_scan():
                     direction=signal["direction"]
                 )
 
-                message = f"""
+                if can_take_trade(trade):
+
+                    register_trade(trade)
+
+                    message = f"""
 SWING TRADE SIGNAL
 
 Stock: {trade['symbol']}
@@ -55,10 +60,13 @@ Risk: ₹{trade['risk_amount']}
 R:R = 1:{trade['rr']}
 """
 
-                print(message)
-                send_message(message)
+                    print(message)
+                    send_message(message)
 
-                signals_found += 1
+                    signals_found += 1
+
+                else:
+                    print(f"Trade skipped (risk control): {symbol}")
 
         except Exception as e:
             print(f"Error scanning {symbol}: {e}")

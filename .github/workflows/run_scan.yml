@@ -18,11 +18,11 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+     - name: Install dependencies
+       run: pip install -r institutional-swing-desk-v2/requirements.txt
 
-      - name: Run scanner
-        run: python main.py
+    - name: Run scanner
+       run: python institutional-swing-desk-v2/main.py
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}

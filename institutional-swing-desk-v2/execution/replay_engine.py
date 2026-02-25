@@ -1,7 +1,8 @@
-import yfinance as yf
-import pandas as pd
+from data_engine.price_loader import load_price
 from core.signal_engine import generate_signal
-
+from core.oi_engine import get_oi_data
+from core.capital_engine import build_trade_plan
+from core.telegram_engine import send_message
 
 WATCHLIST = [
     "RELIANCE",
@@ -14,51 +15,52 @@ WATCHLIST = [
 ]
 
 
-def fetch_price(symbol):
-    df = yf.download(symbol + ".NS", period="3mo", interval="1d", progress=False)
-    df.dropna(inplace=True)
-    return df
-
-
-def calculate_atr(df, period=14):
-    high_low = df["High"] - df["Low"]
-    high_close = abs(df["High"] - df["Close"].shift())
-    low_close = abs(df["Low"] - df["Close"].shift())
-
-    ranges = pd.concat([high_low, high_close, low_close], axis=1)
-    true_range = ranges.max(axis=1)
-
-    atr = true_range.rolling(period).mean().iloc[-1]
-    return float(atr)
-
-
 def run_live_scan():
 
-    signals = []
+    print("SCANNING LIVE MARKET...")
+
+    signals_found = 0
 
     for symbol in WATCHLIST:
 
         try:
-            df = fetch_price(symbol)
+            df = load_price(symbol)
+            oi = get_oi_data(symbol)
 
-            if len(df) < 50:
-                continue
+            signal = generate_signal(df, oi, symbol)
 
-            signal = generate_signal(df)
+            if signal:
 
-            if not signal:
-                continue
+                trade = build_trade_plan(
+                    symbol=signal["symbol"],
+                    entry=signal["entry"],
+                    atr=signal["atr"],
+                    direction=signal["direction"]
+                )
 
-            atr = calculate_atr(df)
+                message = f"""
+SWING TRADE SIGNAL
 
-            signals.append({
-                "symbol": symbol,
-                "entry": float(df["Close"].iloc[-1]),
-                "atr": atr,
-                "direction": signal
-            })
+Stock: {trade['symbol']}
+Direction: {trade['direction']}
+
+Entry: {trade['entry']}
+Stop: {trade['stop']}
+Target: {trade['target']}
+
+Quantity: {trade['quantity']}
+Capital Used: ₹{trade['capital_used']}
+Risk: ₹{trade['risk_amount']}
+
+R:R = 1:{trade['rr']}
+"""
+
+                print(message)
+                send_message(message)
+
+                signals_found += 1
 
         except Exception as e:
-            print("Error processing", symbol, e)
+            print(f"Error scanning {symbol}: {e}")
 
-    return signals
+    print(f"Total signals today: {signals_found}")

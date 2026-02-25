@@ -1,52 +1,64 @@
+import yfinance as yf
 import pandas as pd
-from data_engine.fo_universe_loader import load_fo_universe
-from data_engine.price_loader import load_price
-from data_engine.bhavcopy_loader import load_oi
-
 from core.signal_engine import generate_signal
-from core.position_engine import size_position
-from execution.trade_simulator import simulate
 
 
-class Replay:
+WATCHLIST = [
+    "RELIANCE",
+    "SBIN",
+    "ICICIBANK",
+    "LT",
+    "TATASTEEL",
+    "JSWSTEEL",
+    "ADANIPORTS"
+]
 
-    def run(self):
 
-        capital = 100000
-        universe = load_fo_universe()
+def fetch_price(symbol):
+    df = yf.download(symbol + ".NS", period="3mo", interval="1d", progress=False)
+    df.dropna(inplace=True)
+    return df
 
-        days = pd.date_range("2023-01-01", "2023-12-31", freq="B")
 
-        for d in days:
+def calculate_atr(df, period=14):
+    high_low = df["High"] - df["Low"]
+    high_close = abs(df["High"] - df["Close"].shift())
+    low_close = abs(df["Low"] - df["Close"].shift())
 
-            print("Processing", d.date())
+    ranges = pd.concat([high_low, high_close, low_close], axis=1)
+    true_range = ranges.max(axis=1)
 
-            oi = load_oi(d)
-            if oi is None:
+    atr = true_range.rolling(period).mean().iloc[-1]
+    return float(atr)
+
+
+def run_live_scan():
+
+    signals = []
+
+    for symbol in WATCHLIST:
+
+        try:
+            df = fetch_price(symbol)
+
+            if len(df) < 50:
                 continue
 
-            for s in universe:
+            signal = generate_signal(df)
 
-                df = load_price(s)
-                if df is None:
-                    continue
+            if not signal:
+                continue
 
-                df = df[df.index <= d]
+            atr = calculate_atr(df)
 
-                if len(df) < 40:
-                    continue
+            signals.append({
+                "symbol": symbol,
+                "entry": float(df["Close"].iloc[-1]),
+                "atr": atr,
+                "direction": signal
+            })
 
-                signal = generate_signal(df, oi, s)
-                if signal is None:
-                    continue
+        except Exception as e:
+            print("Error processing", symbol, e)
 
-                qty = size_position(capital, signal["atr"])
-
-                exit_price = simulate(signal, d)
-                if exit_price is None:
-                    continue
-
-                pnl = (exit_price - signal["entry"]) * qty
-                capital += pnl
-
-                print("TRADE:", s, pnl, "Capital:", capital)
+    return signals

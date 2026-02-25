@@ -2,7 +2,7 @@ name: Daily Swing Scan
 
 on:
   schedule:
-    - cron: '50 9 * * 1-5'   # 3:20 PM IST
+    - cron: '50 9 * * 1-5'
   workflow_dispatch:
 
 jobs:
@@ -16,13 +16,13 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          python-version: '3.11'
 
-     - name: Install dependencies
-       run: pip install -r institutional-swing-desk-v2/requirements.txt
+      - name: Install dependencies
+        run: pip install -r institutional-swing-desk-v2/requirements.txt
 
-    - name: Run scanner
-       run: python institutional-swing-desk-v2/main.py
+      - name: Run scanner
+        run: python institutional-swing-desk-v2/main.py
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
